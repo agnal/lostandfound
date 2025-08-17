@@ -4,7 +4,7 @@ const mongoose = require('mongoose');
 const { expect } = chai;
 
 const Item = require('../models/Item');
-const itemController = require('../controllers/itemController');
+const itemController = require('../controllers/mainController');
 
 describe('Item Controller Tests', () => {
 
