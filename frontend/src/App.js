@@ -4,6 +4,8 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Profile from './pages/Profile';
 import Tasks from './pages/Tasks';
+import AddItems from './pages/add_items';
+
 
 function App() {
   return (
@@ -13,7 +15,9 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/profile" element={<Profile />} />
-        <Route path="/tasks" element={<Tasks />} />
+        <Route path="/" element={<Tasks />} />
+        <Route path="/add-items" element={<AddItems />} />
+
       </Routes>
     </Router>
   );

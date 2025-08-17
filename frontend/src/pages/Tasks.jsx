@@ -1,40 +1,49 @@
 import { useState, useEffect } from 'react';
 import axiosInstance from '../axiosConfig';
-import TaskForm from '../components/TaskForm';
-import TaskList from '../components/TaskList';
+import ItemList from '../components/ItemList';
 import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 const Tasks = () => {
   const { user } = useAuth();
   const [tasks, setTasks] = useState([]);
-  const [editingTask, setEditingTask] = useState(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchTasks = async () => {
       try {
-        const response = await axiosInstance.get('/api/tasks', {
+        const response = await axiosInstance.get('/api/main/items/all', {
           headers: { Authorization: `Bearer ${user.token}` },
         });
         setTasks(response.data);
       } catch (error) {
-        alert('Failed to fetch tasks.');
+        // alert('Failed to fetch tasks.');
       }
     };
 
     fetchTasks();
+
   }, [user]);
 
   return (
-    <div className="container mx-auto p-6">
-      <TaskForm
-        tasks={tasks}
-        setTasks={setTasks}
-        editingTask={editingTask}
-        setEditingTask={setEditingTask}
-      />
-      <TaskList tasks={tasks} setTasks={setTasks} setEditingTask={setEditingTask} />
+    <div className="container mx-auto p-6 relative">
+
+      <ItemList initialTasks={tasks} />
+
+      {/* Floating Action Button */}
+      {!user?.isAdmin && (
+        <button
+          className="fixed bottom-8 right-8 bg-blue-600 hover:bg-blue-700 text-white rounded-full w-16 h-16 flex items-center justify-center shadow-lg text-3xl"
+          aria-label="Add Lost or Found Item"
+          onClick={() => navigate('/add-items')}
+        >
+          +
+        </button>
+      )}
+
     </div>
   );
+  // ...existing code...
 };
 
 export default Tasks;
