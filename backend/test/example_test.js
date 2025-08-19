@@ -1,3 +1,4 @@
+// test/item.controller.test.js
 const chai = require('chai');
 const sinon = require('sinon');
 const mongoose = require('mongoose');
@@ -7,7 +8,6 @@ const Item = require('../models/Item');
 const itemController = require('../controllers/mainController');
 
 describe('Item Controller Tests', () => {
-
   afterEach(() => {
     sinon.restore();
   });
@@ -19,19 +19,23 @@ describe('Item Controller Tests', () => {
         body: {
           title: 'Phone',
           description: 'Black iPhone',
-          deadline: '2025-12-31'
+          deadline: '2025-12-31',
         },
         file: { filename: 'image.jpg' },
-        user: { _id: new mongoose.Types.ObjectId() }
+        user: { _id: new mongoose.Types.ObjectId() },
       };
 
-      const savedItem = { ...req.body, image: `/uploads/image.jpg`, user_id: req.user._id };
+      const savedItem = {
+        ...req.body,
+        image: `/uploads/${req.file.filename}`,
+        user_id: req.user._id,
+      };
 
       const saveStub = sinon.stub(Item.prototype, 'save').resolves(savedItem);
 
       const res = {
         status: sinon.stub().returnsThis(),
-        json: sinon.spy()
+        json: sinon.spy(),
       };
 
       await itemController.createItem(req, res);
@@ -43,15 +47,15 @@ describe('Item Controller Tests', () => {
 
     it('should return 500 if an error occurs', async () => {
       const req = {
-        body: {},
-        user: { _id: new mongoose.Types.ObjectId() }
+        body: { title: 'X' },
+        user: { _id: new mongoose.Types.ObjectId() },
       };
 
       sinon.stub(Item.prototype, 'save').throws(new Error('DB Error'));
 
       const res = {
         status: sinon.stub().returnsThis(),
-        json: sinon.spy()
+        json: sinon.spy(),
       };
 
       await itemController.createItem(req, res);
@@ -70,10 +74,15 @@ describe('Item Controller Tests', () => {
       const req = { user: { _id: userId } };
       const res = { json: sinon.spy(), status: sinon.stub().returnsThis() };
 
-      sinon.stub(Item, 'find').resolves(mockItems);
+      // Stub the chain: Item.find(...).sort({ createdAt: -1 })
+      const sortStub = sinon.stub().resolves(mockItems);
+      const findStub = sinon.stub(Item, 'find').returns({ sort: sortStub });
 
       await itemController.getItems(req, res);
 
+      expect(findStub.calledOnceWith({ user_id: userId })).to.be.true;
+      expect(sortStub.calledOnceWith({ createdAt: -1 })).to.be.true;
+      expect(res.status.called).to.be.false; // default 200
       expect(res.json.calledWith(mockItems)).to.be.true;
     });
 
@@ -81,7 +90,8 @@ describe('Item Controller Tests', () => {
       const req = { user: { _id: new mongoose.Types.ObjectId() } };
       const res = { json: sinon.spy(), status: sinon.stub().returnsThis() };
 
-      sinon.stub(Item, 'find').throws(new Error('DB Error'));
+      const sortReject = sinon.stub().rejects(new Error('DB Error'));
+      sinon.stub(Item, 'find').returns({ sort: sortReject });
 
       await itemController.getItems(req, res);
 
@@ -94,13 +104,17 @@ describe('Item Controller Tests', () => {
   describe('geAllItems', () => {
     it('should return all items', async () => {
       const mockItems = [{ title: 'Watch' }];
-      sinon.stub(Item, 'find').resolves(mockItems);
+
+      const sortStub = sinon.stub().resolves(mockItems);
+      sinon.stub(Item, 'find').returns({ sort: sortStub });
 
       const req = {};
       const res = { json: sinon.spy(), status: sinon.stub().returnsThis() };
 
       await itemController.geAllItems(req, res);
 
+      expect(sortStub.calledOnceWith({ createdAt: -1 })).to.be.true;
+      expect(res.status.called).to.be.false;
       expect(res.json.calledWith(mockItems)).to.be.true;
     });
   });
@@ -119,13 +133,17 @@ describe('Item Controller Tests', () => {
 
       await itemController.getItemById(req, res);
 
+      expect(res.status.called).to.be.false;
       expect(res.json.calledWith(mockItem)).to.be.true;
     });
 
     it('should return 404 if item not found', async () => {
       sinon.stub(Item, 'findOne').resolves(null);
 
-      const req = { params: { id: new mongoose.Types.ObjectId() }, user: { _id: new mongoose.Types.ObjectId() } };
+      const req = {
+        params: { id: new mongoose.Types.ObjectId() },
+        user: { _id: new mongoose.Types.ObjectId() },
+      };
       const res = { json: sinon.spy(), status: sinon.stub().returnsThis() };
 
       await itemController.getItemById(req, res);
@@ -145,12 +163,13 @@ describe('Item Controller Tests', () => {
       const req = {
         params: { id: new mongoose.Types.ObjectId() },
         user: { _id: new mongoose.Types.ObjectId() },
-        body: updatedItem
+        body: updatedItem,
       };
       const res = { json: sinon.spy(), status: sinon.stub().returnsThis() };
 
       await itemController.updateItem(req, res);
 
+      expect(res.status.called).to.be.false;
       expect(res.json.calledWith(updatedItem)).to.be.true;
     });
 
@@ -160,7 +179,7 @@ describe('Item Controller Tests', () => {
       const req = {
         params: { id: new mongoose.Types.ObjectId() },
         user: { _id: new mongoose.Types.ObjectId() },
-        body: { title: 'New' }
+        body: { title: 'New' },
       };
       const res = { json: sinon.spy(), status: sinon.stub().returnsThis() };
 
@@ -178,12 +197,13 @@ describe('Item Controller Tests', () => {
 
       const req = {
         params: { id: new mongoose.Types.ObjectId() },
-        user: { _id: new mongoose.Types.ObjectId() }
+        user: { _id: new mongoose.Types.ObjectId() },
       };
       const res = { json: sinon.spy(), status: sinon.stub().returnsThis() };
 
       await itemController.deleteItem(req, res);
 
+      expect(res.status.called).to.be.false;
       expect(res.json.calledWith({ message: 'Item deleted successfully' })).to.be.true;
     });
 
@@ -192,7 +212,7 @@ describe('Item Controller Tests', () => {
 
       const req = {
         params: { id: new mongoose.Types.ObjectId() },
-        user: { _id: new mongoose.Types.ObjectId() }
+        user: { _id: new mongoose.Types.ObjectId() },
       };
       const res = { json: sinon.spy(), status: sinon.stub().returnsThis() };
 
@@ -201,5 +221,4 @@ describe('Item Controller Tests', () => {
       expect(res.status.calledWith(404)).to.be.true;
     });
   });
-
 });
