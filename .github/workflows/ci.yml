@@ -1,81 +1,76 @@
 name: Backend CI
- 
+
 on:
   push:
     branches:
       - main  # Trigger CI on pushes to the main branch
- 
- 
+
 jobs:
   test:
     name: Run Tests
-    runs-on: [self-hosted, Linux, X64]
- 
+    runs-on: [self-hosted, linux, x64]  # labels must match your runner exactly
+
     strategy:
       matrix:
         node-version: [22] # Test on multiple Node.js versions
- 
- 
-    environment: MONGO_URI
- 
+
+    # Optional env name; remove if you don't use Environments in GitHub
+    environment: production
+
     steps:
-    - name: Checkout Code
-      uses: actions/checkout@v3
- 
-    # Set up Node.js
-    - name: Setup Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: ${{ matrix.node-version }}
- 
-    - name: Print Env Secret
- 
-      env:
-        MONGO_URI: ${{ secrets.MONGO_URI }}
-        JWT_SECRET: ${{ secrets.JWT_SECRET }}
-        PORT: ${{ secrets.PORT }}
-      run: |
-        echo "Secret 1 is: $MONGO_URI"
-        echo "Secret 2 is: $JWT_SECRET"
-        echo "Secret 3 is: $PORT"
-     
-    - run: pm2 stop all
- 
-    # Install dependencies for backend
-    - name: Install Backend Dependencies
-      working-directory: ./backend
-      run: |
-       npm install --global yarn
-       yarn --version
-       yarn install
-     
-    # Install dependencies for frontend
-    - name: Install Frontend Dependencies
-      working-directory: ./frontend
-      run: |
-        df -h
-        sudo rm -rf ./build
-        yarn install
-        yarn run build
- 
- 
-    # Run backend tests
-    - name: Run Backend Tests
-      env:
-        MONGO_URI: ${{ secrets.MONGO_URI }}
-        JWT_SECRET: ${{ secrets.JWT_SECRET }}
-        PORT: ${{ secrets.PORT }}
-      working-directory: ./backend
-      run: npm test
- 
- 
-    - run: npm ci
-    - run: |
-        cd ./backend
-        touch .env
-        echo "${{ secrets.PROD }}" > .env
- 
-    - run: pm2 start all
- 
-    - run: pm2 restart all 
- 
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      # Set up Node.js (with npm cache)
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+
+      # Install dependencies for backend
+      - name: Install Backend Dependencies
+        working-directory: ./backend
+        run: npm ci
+
+      # Run backend tests
+      - name: Run Backend Tests
+        working-directory: ./backend
+        env:
+          MONGO_URI: ${{ secrets.MONGO_URI }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          PORT: ${{ secrets.PORT }}
+        run: npm test
+
+      # Install dependencies for frontend
+      - name: Install Frontend Dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      # Build frontend
+      - name: Build Frontend
+        working-directory: ./frontend
+        run: npm run build
+
+      # (Optional) Write backend .env from secret (multi-line safe)
+      - name: Write Backend .env
+        working-directory: ./backend
+        env:
+          PROD_ENV: ${{ secrets.PROD }}
+        run: |
+          printf "%s" "$PROD_ENV" > .env
+
+      # (Optional) Restart backend with PM2 — safer than "pm2 start all"
+      - name: Restart Backend with PM2
+        working-directory: ./backend
+        env:
+          MONGO_URI: ${{ secrets.MONGO_URI }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          PORT: ${{ secrets.PORT }}
+        run: |
+          pm2 delete lostandfound-backend || true
+          pm2 start npm --name lostandfound-backend -- run start
+          pm2 save
