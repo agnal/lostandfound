@@ -71,6 +71,6 @@ jobs:
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           PORT: ${{ secrets.PORT }}
         run: |
-          pm2 delete lostandfound-backend || true
-          pm2 start npm --name lostandfound-backend -- run start
+          pm2 delete backend || true
+          pm2 start npm --name backend -- run start
           pm2 save
