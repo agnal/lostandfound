@@ -7,12 +7,19 @@ on:
 jobs:
   test:
     name: Run Tests
-    # If your runner has extra labels (case-sensitive), add them:
+    # If your runner has extra labels, add them (case-sensitive), e.g.:
     # runs-on: [self-hosted, linux, x64]
     runs-on: self-hosted
 
     strategy:
       matrix: { node-version: [22] }
+
+    # Expose secrets as env vars for all steps
+    env:
+      MONGO_URI: ${{ secrets.MONGO_URI }}
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
+      PORT: ${{ secrets.PORT }}
+      PROD_ENV: ${{ secrets.PROD }}
 
     steps:
       - name: Checkout Code
@@ -27,6 +34,15 @@ jobs:
             backend/package-lock.json
             frontend/package-lock.json
 
+      # ---- PM2 present + tolerant cleanup ----
+      - name: Ensure PM2 is installed
+        run: npm i -g pm2
+
+      - name: Stop previous app if running
+        run: |
+          pm2 delete lostandfound-backend || true
+          pm2 kill || true
+
       # ---- Backend ----
       - name: Install Backend Dependencies
         working-directory: ./backend
@@ -34,10 +50,6 @@ jobs:
 
       - name: Run Backend Tests
         working-directory: ./backend
-        env:
-          MONGO_URI: ${{ secrets.MONGO_URI }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
-          PORT: ${{ secrets.PORT }}
         run: npm test
 
       # ---- Frontend ----
@@ -49,26 +61,21 @@ jobs:
         working-directory: ./frontend
         run: npm run build
 
-      # ---- Deploy with PM2 (safe & idempotent) ----
-      - name: Ensure PM2 is installed
-        run: npm i -g pm2
-
-      # Optional: write multi-line .env from secret (remove if unused)
-      - name: Write Backend .env
-        if: ${{ secrets.PROD != '' }}
+      # ---- Write .env only if provided (no 'if:' expression needed) ----
+      - name: Write Backend .env (if provided)
         working-directory: ./backend
-        env:
-          PROD_ENV: ${{ secrets.PROD }}
-        run: printf "%s" "$PROD_ENV" > .env
-
-      - name: Restart backend with PM2
-        working-directory: ./backend
-        env:
-          MONGO_URI: ${{ secrets.MONGO_URI }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
-          PORT: ${{ secrets.PORT }}
         run: |
-          pm2 delete lostandfound-backend || true
+          if [ -n "$PROD_ENV" ]; then
+            printf "%s" "$PROD_ENV" > .env
+            echo ".env written"
+          else
+            echo "PROD_ENV not set; skipping .env write"
+          fi
+
+      # ---- Start backend with a named PM2 process ----
+      - name: Start backend with PM2
+        working-directory: ./backend
+        run: |
           pm2 start npm --name lostandfound-backend -- run start
           pm2 save
 
