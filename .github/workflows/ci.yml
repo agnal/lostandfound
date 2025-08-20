@@ -3,30 +3,44 @@ name: Backend CI
 on:
   push:
     branches: [ main ]
+    # Only run when backend, frontend, or workflow files change
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - '.github/workflows/**'
 
 jobs:
-  test:
+  build_test_deploy:
     name: Build, Test, and Run (PM2)
     runs-on: self-hosted
 
-    # IMPORTANT: bind to your GitHub Environment so environment secrets are available
+    # Bind to your GitHub Environment so environment-scoped secrets are available
     environment:
-      name: production  # <-- change this to your environment's name
+      name: production   # <-- change to your Environment name
 
     strategy:
       matrix:
         node-version: [22]
 
-    # Job-level env: safe to reference, but NEVER echo them
+    # Job-level env (do NOT print these)
     env:
       MONGO_URI: ${{ secrets.MONGO_URI }}
       JWT_SECRET: ${{ secrets.JWT_SECRET }}
       PORT: ${{ secrets.PORT }}
-      PROD: ${{ secrets.PROD }}  # optional: multi-line env blob if you use it
+      PROD: ${{ secrets.PROD }}  # optional: if you store a full .env blob here
+      CI: true
+      # Speed up installs by skipping heavy optional downloads (if safe for your deps)
+      PUPPETEER_SKIP_DOWNLOAD: 'true'
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+      npm_config_prefer_offline: 'true'
+      npm_config_audit: 'false'
+      npm_config_fund: 'false'
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 2   # needed so we can diff HEAD^ HEAD for change detection
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -40,22 +54,31 @@ jobs:
       - name: Stop PM2 apps if any (no-op OK)
         run: pm2 stop all || echo "No PM2 processes to stop"
 
-      # ---------- Backend ----------
+      # ---------- BACKEND ----------
+      - name: Cache backend deps
+        uses: actions/cache@v4
+        with:
+          path: |
+            backend/node_modules
+            ~/.npm
+          key: be-npm-${{ runner.os }}-${{ matrix.node-version }}-${{ hashFiles('backend/package-lock.json') }}
+          restore-keys: |
+            be-npm-${{ runner.os }}-${{ matrix.node-version }}-
+
       - name: Install Backend Dependencies
         working-directory: ./backend
-        run: |
-          npm ci || npm install
+        run: npm ci || npm install
 
       - name: Write .env for backend
         working-directory: ./backend
         shell: bash
         run: |
-          # Write the 3 standard vars if present
+          # Write standard vars if present
           [ -n "${MONGO_URI}" ] && echo "MONGO_URI=${MONGO_URI}" >> .env
           [ -n "${JWT_SECRET}" ] && echo "JWT_SECRET=${JWT_SECRET}" >> .env
           [ -n "${PORT}" ] && echo "PORT=${PORT}" >> .env
 
-          # If you keep a full .env blob in PROD secret, write it last to override
+          # If you keep a full .env blob in PROD, append it last to override
           if [ -n "${PROD}" ]; then
             printf "%s" "${PROD}" >> .env
             echo ".env merged with PROD environment secret"
@@ -71,16 +94,40 @@ jobs:
           PORT: ${{ secrets.PORT }}
         run: npm test
 
-      # ---------- Frontend (optional, only if the folder exists) ----------
-      - name: Install Frontend Dependencies (if present)
-        if: ${{ hashFiles('frontend/package.json') != '' }}
-        working-directory: ./frontend
+      # ---------- FRONTEND (skip if unchanged or missing) ----------
+      - name: Detect frontend changes
+        id: fe_changed
+        shell: bash
         run: |
-          rm -rf ./build
-          npm ci || npm install
+          if [ ! -d "frontend" ] || [ ! -f "frontend/package.json" ]; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          # diff last commit vs current
+          if git diff --quiet HEAD^ HEAD -- frontend; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
 
-      - name: Build Frontend (if present)
-        if: ${{ hashFiles('frontend/package.json') != '' }}
+      - name: Cache frontend deps
+        if: steps.fe_changed.outputs.changed == 'true'
+        uses: actions/cache@v4
+        with:
+          path: |
+            frontend/node_modules
+            ~/.npm
+          key: fe-npm-${{ runner.os }}-${{ matrix.node-version }}-${{ hashFiles('frontend/package-lock.json') }}
+          restore-keys: |
+            fe-npm-${{ runner.os }}-${{ matrix.node-version }}-
+
+      - name: Install Frontend Dependencies
+        if: steps.fe_changed.outputs.changed == 'true'
+        working-directory: ./frontend
+        run: npm ci --no-audit --prefer-offline || npm install
+
+      - name: Build Frontend
+        if: steps.fe_changed.outputs.changed == 'true'
         working-directory: ./frontend
         run: npm run build
 
@@ -89,11 +136,10 @@ jobs:
         working-directory: ./backend
         shell: bash
         run: |
+          # Use ecosystem if present, else direct script
           if [ -f ecosystem.config.js ]; then
-            # Use ecosystem if you have it committed
             pm2 start ecosystem.config.js --env production || pm2 reload ecosystem.config.js --env production
           else
-            # Direct script fallback; name your app consistently
             pm2 start server.js --name task-manager-backend || pm2 reload task-manager-backend
           fi
 
