@@ -13,7 +13,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [22] # Test on multiple Node.js versions
+        node-version: [22] # Test on multiple Node.js version
 
 
     environment: MONGO_URI
@@ -22,7 +22,7 @@ jobs:
     - name: Checkout Code
       uses: actions/checkout@v3
 
-    # Set up Node.js
+    # Set up Node.js 
     - name: Setup Node.js
       uses: actions/setup-node@v3
       with:
