@@ -2,146 +2,78 @@ name: Backend CI
 
 on:
   push:
-    branches: [ main ]
-    # Only run when backend, frontend, or workflow files change
-    paths:
-      - 'backend/**'
-      - 'frontend/**'
-      - '.github/workflows/**'
+    branches:
+      - main  # Trigger CI on pushes to the main branch
 
 jobs:
-  build_test_deploy:
-    name: Build, Test, and Run (PM2)
+  test:
+    name: Run Tests
     runs-on: self-hosted
-
-    # Bind to your GitHub Environment so environment-scoped secrets are available
-    environment:
-      name: production   # <-- change to your Environment name
 
     strategy:
       matrix:
-        node-version: [22]
+        node-version: [22] # Test on multiple Node.js versions
 
-    # Job-level env (do NOT print these)
-    env:
-      MONGO_URI: ${{ secrets.MONGO_URI }}
-      JWT_SECRET: ${{ secrets.JWT_SECRET }}
-      PORT: ${{ secrets.PORT }}
-      PROD: ${{ secrets.PROD }}  # optional: if you store a full .env blob here
-      CI: true
-      # Speed up installs by skipping heavy optional downloads (if safe for your deps)
-      PUPPETEER_SKIP_DOWNLOAD: 'true'
-      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
-      npm_config_prefer_offline: 'true'
-      npm_config_audit: 'false'
-      npm_config_fund: 'false'
+    # If you stored secrets in a GitHub Environment, set its name here:
+    # environment:
+    #   name: production  # <-- change to your environment name
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 2   # needed so we can diff HEAD^ HEAD for change detection
 
+      # Set up Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
-          cache: 'npm'
 
-      - name: Ensure PM2
+      - name: Ensure PM2 is installed
         run: npm i -g pm2
 
-      - name: Stop PM2 apps if any (no-op OK)
-        run: pm2 stop all || echo "No PM2 processes to stop"
+      - name: Stop PM2 app if running (no-op OK)
+        run: pm2 stop lostandfound-backend || echo "App not running"
 
-      # ---------- BACKEND ----------
-      - name: Cache backend deps
-        uses: actions/cache@v4
-        with:
-          path: |
-            backend/node_modules
-            ~/.npm
-          key: be-npm-${{ runner.os }}-${{ matrix.node-version }}-${{ hashFiles('backend/package-lock.json') }}
-          restore-keys: |
-            be-npm-${{ runner.os }}-${{ matrix.node-version }}-
-
+      # Install dependencies for backend
       - name: Install Backend Dependencies
         working-directory: ./backend
-        run: npm ci || npm install
-
-      - name: Write .env for backend
-        working-directory: ./backend
-        shell: bash
         run: |
-          # Write standard vars if present
-          [ -n "${MONGO_URI}" ] && echo "MONGO_URI=${MONGO_URI}" >> .env
-          [ -n "${JWT_SECRET}" ] && echo "JWT_SECRET=${JWT_SECRET}" >> .env
-          [ -n "${PORT}" ] && echo "PORT=${PORT}" >> .env
+          npm install --global yarn
+          yarn --version
+          yarn install
 
-          # If you keep a full .env blob in PROD, append it last to override
-          if [ -n "${PROD}" ]; then
-            printf "%s" "${PROD}" >> .env
-            echo ".env merged with PROD environment secret"
-          else
-            echo ".env written from individual secrets"
-          fi
+      # Install dependencies for frontend
+      - name: Install Frontend Dependencies
+        working-directory: ./frontend
+        run: |
+          df -h
+          rm -rf ./build
+          yarn install
+          yarn run build
 
+      # Run backend tests
       - name: Run Backend Tests
-        working-directory: ./backend
         env:
           MONGO_URI: ${{ secrets.MONGO_URI }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           PORT: ${{ secrets.PORT }}
+        working-directory: ./backend
         run: npm test
 
-      # ---------- FRONTEND (skip if unchanged or missing) ----------
-      - name: Detect frontend changes
-        id: fe_changed
-        shell: bash
-        run: |
-          if [ ! -d "frontend" ] || [ ! -f "frontend/package.json" ]; then
-            echo "changed=false" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-          # diff last commit vs current
-          if git diff --quiet HEAD^ HEAD -- frontend; then
-            echo "changed=false" >> $GITHUB_OUTPUT
-          else
-            echo "changed=true" >> $GITHUB_OUTPUT
-          fi
+      # (Optional) Root npm ci is usually unnecessary; remove if you don't need it
+      # - run: npm ci
 
-      - name: Cache frontend deps
-        if: steps.fe_changed.outputs.changed == 'true'
-        uses: actions/cache@v4
-        with:
-          path: |
-            frontend/node_modules
-            ~/.npm
-          key: fe-npm-${{ runner.os }}-${{ matrix.node-version }}-${{ hashFiles('frontend/package-lock.json') }}
-          restore-keys: |
-            fe-npm-${{ runner.os }}-${{ matrix.node-version }}-
-
-      - name: Install Frontend Dependencies
-        if: steps.fe_changed.outputs.changed == 'true'
-        working-directory: ./frontend
-        run: npm ci --no-audit --prefer-offline || npm install
-
-      - name: Build Frontend
-        if: steps.fe_changed.outputs.changed == 'true'
-        working-directory: ./frontend
-        run: npm run build
-
-      # ---------- PM2 start/reload ----------
-      - name: Start/Reload PM2 (backend)
+      - name: Write .env for backend (from PROD secret)
         working-directory: ./backend
-        shell: bash
         run: |
-          # Use ecosystem if present, else direct script
-          if [ -f ecosystem.config.js ]; then
-            pm2 start ecosystem.config.js --env production || pm2 reload ecosystem.config.js --env production
-          else
-            pm2 start server.js --name task-manager-backend || pm2 reload task-manager-backend
-          fi
+          touch .env
+          printf "%s" "${{ secrets.PROD }}" > .env
+
+      # Use your working PM2 command with a restart fallback
+      - name: Start backend with PM2 (npm start)
+        working-directory: ./backend
+        run: |
+          pm2 start npm --name lostandfound-backend -- start || pm2 restart lostandfound-backend
 
       - name: Save PM2 process list
         run: pm2 save || true
