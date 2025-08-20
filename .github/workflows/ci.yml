@@ -6,18 +6,23 @@ on:
 
 jobs:
   test:
-    name: Run Tests
+    name: Build, Test, and Run (PM2)
     runs-on: self-hosted
+
+    # IMPORTANT: bind to your GitHub Environment so environment secrets are available
+    environment:
+      name: production  # <-- change this to your environment's name
 
     strategy:
       matrix:
         node-version: [22]
 
-    # Job-level env (available to all steps). Do NOT print these.
+    # Job-level env: safe to reference, but NEVER echo them
     env:
       MONGO_URI: ${{ secrets.MONGO_URI }}
       JWT_SECRET: ${{ secrets.JWT_SECRET }}
       PORT: ${{ secrets.PORT }}
+      PROD: ${{ secrets.PROD }}  # optional: multi-line env blob if you use it
 
     steps:
       - name: Checkout Code
@@ -27,12 +32,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
-          cache: 'yarn'
+          cache: 'npm'
 
-      - name: Enable Corepack (Yarn)
-        run: corepack enable
-
-      - name: Ensure PM2 is installed
+      - name: Ensure PM2
         run: npm i -g pm2
 
       - name: Stop PM2 apps if any (no-op OK)
@@ -42,14 +44,24 @@ jobs:
       - name: Install Backend Dependencies
         working-directory: ./backend
         run: |
-          yarn --version
-          yarn install --frozen-lockfile
+          npm ci || npm install
 
-      - name: Write backend .env from PROD secret (optional)
-        if: ${{ secrets.PROD != '' }}
+      - name: Write .env for backend
         working-directory: ./backend
+        shell: bash
         run: |
-          printf "%s" "${{ secrets.PROD }}" > .env
+          # Write the 3 standard vars if present
+          [ -n "${MONGO_URI}" ] && echo "MONGO_URI=${MONGO_URI}" >> .env
+          [ -n "${JWT_SECRET}" ] && echo "JWT_SECRET=${JWT_SECRET}" >> .env
+          [ -n "${PORT}" ] && echo "PORT=${PORT}" >> .env
+
+          # If you keep a full .env blob in PROD secret, write it last to override
+          if [ -n "${PROD}" ]; then
+            printf "%s" "${PROD}" >> .env
+            echo ".env merged with PROD environment secret"
+          else
+            echo ".env written from individual secrets"
+          fi
 
       - name: Run Backend Tests
         working-directory: ./backend
@@ -57,29 +69,32 @@ jobs:
           MONGO_URI: ${{ secrets.MONGO_URI }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           PORT: ${{ secrets.PORT }}
-        run: yarn test
+        run: npm test
 
-      # ---------- Frontend ----------
-      - name: Install Frontend Dependencies
+      # ---------- Frontend (optional, only if the folder exists) ----------
+      - name: Install Frontend Dependencies (if present)
+        if: ${{ hashFiles('frontend/package.json') != '' }}
         working-directory: ./frontend
         run: |
           rm -rf ./build
-          yarn install --frozen-lockfile
+          npm ci || npm install
 
-      - name: Build Frontend
+      - name: Build Frontend (if present)
+        if: ${{ hashFiles('frontend/package.json') != '' }}
         working-directory: ./frontend
-        run: yarn build
+        run: npm run build
 
-      # ---------- (Optional) Deploy/Run with PM2 ----------
-      # Make sure you have backend/ecosystem.config.js committed, or swap command accordingly.
+      # ---------- PM2 start/reload ----------
       - name: Start/Reload PM2 (backend)
         working-directory: ./backend
+        shell: bash
         run: |
           if [ -f ecosystem.config.js ]; then
+            # Use ecosystem if you have it committed
             pm2 start ecosystem.config.js --env production || pm2 reload ecosystem.config.js --env production
           else
-            # Fallback: start by script; replace server.js/name to match your project
-            pm2 start server.js --name lostandfound-backend || pm2 reload lostandfound-backend
+            # Direct script fallback; name your app consistently
+            pm2 start server.js --name task-manager-backend || pm2 reload task-manager-backend
           fi
 
       - name: Save PM2 process list
