@@ -2,9 +2,7 @@ name: Backend CI
 
 on:
   push:
-    branches:
-      - main  # Trigger CI on pushes to the main branch
-
+    branches: [ main ]
 
 jobs:
   test:
@@ -13,68 +11,76 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [22] # Test on multiple Node.js versions
+        node-version: [22]
 
-
-    environment: MONGO_URI
+    # Job-level env (available to all steps). Do NOT print these.
+    env:
+      MONGO_URI: ${{ secrets.MONGO_URI }}
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
+      PORT: ${{ secrets.PORT }}
 
     steps:
-    - name: Checkout Code
-      uses: actions/checkout@v3
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-    # Set up Node.js
-    - name: Setup Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: ${{ matrix.node-version }}
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'yarn'
 
-    - name: Print Env Secret
+      - name: Enable Corepack (Yarn)
+        run: corepack enable
 
-      env:
-        MONGO_URI: ${{ secrets.MONGO_URI }}
-        JWT_SECRET: ${{ secrets.JWT_SECRET }}
-        PORT: ${{ secrets.PORT }}
-      run: | 
-        echo "Secret 1 is: $MONGO_URI"
-        echo "Secret 2 is: $JWT_SECRET"
-        echo "Secret 3 is: $PORT"
-      
-    - run: pm2 stop all
+      - name: Ensure PM2 is installed
+        run: npm i -g pm2
 
-    # Install dependencies for backend
-    - name: Install Backend Dependencies
-      working-directory: ./backend
-      run: | 
-       npm install --global yarn
-       yarn --version
-       yarn install
-      
-    # Install dependencies for frontend
-    - name: Install Frontend Dependencies
-      working-directory: ./frontend
-      run: |
-        df -h
-        sudo rm -rf ./build
-        yarn install
-        yarn run build
+      - name: Stop PM2 apps if any (no-op OK)
+        run: pm2 stop all || echo "No PM2 processes to stop"
 
+      # ---------- Backend ----------
+      - name: Install Backend Dependencies
+        working-directory: ./backend
+        run: |
+          yarn --version
+          yarn install --frozen-lockfile
 
-    # Run backend tests
-    - name: Run Backend Tests
-      env:
-        MONGO_URI: ${{ secrets.MONGO_URI }}
-        JWT_SECRET: ${{ secrets.JWT_SECRET }}
-        PORT: ${{ secrets.PORT }}
-      working-directory: ./backend
-      run: npm test
+      - name: Write backend .env from PROD secret (optional)
+        if: ${{ secrets.PROD != '' }}
+        working-directory: ./backend
+        run: |
+          printf "%s" "${{ secrets.PROD }}" > .env
 
+      - name: Run Backend Tests
+        working-directory: ./backend
+        env:
+          MONGO_URI: ${{ secrets.MONGO_URI }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          PORT: ${{ secrets.PORT }}
+        run: yarn test
 
-    - run: npm ci
-    - run: | 
-        cd ./backend
-        touch .env
-        echo "${{ secrets.PROD }}" > .env
+      # ---------- Frontend ----------
+      - name: Install Frontend Dependencies
+        working-directory: ./frontend
+        run: |
+          rm -rf ./build
+          yarn install --frozen-lockfile
 
-    - run: pm2 start all
+      - name: Build Frontend
+        working-directory: ./frontend
+        run: yarn build
 
-    - run: pm2 restart all
+      # ---------- (Optional) Deploy/Run with PM2 ----------
+      # Make sure you have backend/ecosystem.config.js committed, or swap command accordingly.
+      - name: Start/Reload PM2 (backend)
+        working-directory: ./backend
+        run: |
+          if [ -f ecosystem.config.js ]; then
+            pm2 start ecosystem.config.js --env production || pm2 reload ecosystem.config.js --env production
+          else
+            # Fallback: start by script; replace server.js/name to match your project
+            pm2 start server.js --name lostandfound-backend || pm2 reload lostandfound-backend
+          fi
+
+      - name: Save PM2 process list
+        run: pm2 save || true
