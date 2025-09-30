@@ -17,7 +17,7 @@ const Tasks = () => {
         });
         setTasks(response.data);
       } catch (error) {
-        // alert('Failed to fetch tasks.');
+        // alert('Failed to fetch tasks');
       }
     };
 
