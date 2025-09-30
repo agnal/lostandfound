@@ -5,13 +5,14 @@ const { addRecentlyAddedTag } = require('../services/decorators/itemDecorators')
 // ✅ Create a new item
 exports.createItem = async (req, res) => {
    try {
-    const { title, description, deadline } = req.body;
+    const { title, description, deadline,category } = req.body;
 
     // multer makes uploaded file available at req.file
     const newItem = new Item({
       title,
       description,
       deadline,
+      category,
       image: req.file ? `/uploads/${req.file.filename}` : null, // store path
       user_id: req.user._id, // from auth middleware
     });
@@ -37,7 +38,7 @@ exports.getItems = async (req, res) => {
     const items = await Item.find({ user_id: req.user._id }).sort({ createdAt: -1 });
      // Update recent status for each item
     // items = items.map(item => checkRecentStatus(item));
-    items = items.map(item => addRecentlyAddedTag(item, 24));
+    items = items.map(item => addRecentlyAddedTag(item, 1));
     res.json(items);
   } catch (error) {
     res.status(500).json({ message: "Error fetching items", error });
@@ -47,11 +48,36 @@ exports.getItems = async (req, res) => {
 // ✅ Get all items 
 exports.geAllItems = async (req, res) => {
   try {
+    let { sortBy } = req.query;
     let items = await Item.find().sort({ createdAt: -1 });
-    items = items.map(item => addRecentlyAddedTag(item, 24));
+    items = items.map(item => addRecentlyAddedTag(item, 1));
+
+    // Sort items based on strategy
+    switch (sortBy) {
+      case 'recent':
+        items.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        break;
+      case 'verified':
+        items.sort((a, b) => (b.verified === true) - (a.verified === true));
+        break;
+      case 'category':
+        items.sort((a, b) => a.category.localeCompare(b.category)); // assuming items have category field
+        break;
+      default:
+        // default to recent
+        items.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    }
+
+
+
+
+
+
     res.json(items);
 
-    // res.json(items);
+    
+
+   
   } catch (error) {
     res.status(500).json({ message: "Error fetching items", error });
   }
