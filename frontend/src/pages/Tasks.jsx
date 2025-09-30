@@ -41,7 +41,7 @@ const Tasks = () => {
           aria-label="Add Lost or Found Item"
           onClick={() => navigate('/add-items')}
         >
-          +
+          
         </button>
       )}
     </div>
