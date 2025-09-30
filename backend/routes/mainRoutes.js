@@ -8,7 +8,7 @@ const {
   deleteItem,
   geAllItems
 } = require("../controllers/mainController");
-const { protect } = require("../middleware/authMiddleware");
+const { protect } = require("../services/middleware/authMiddleware");
 const multer = require("multer");
 const router = express.Router();
 

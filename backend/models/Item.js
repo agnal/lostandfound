@@ -10,6 +10,12 @@ const itemSchema = new mongoose.Schema({
       ref: "User",
       required: true,
     },
+    category: {
+    type: String,
+    enum: ['Electronics', 'Documents', 'Clothing', 'Accessories', 'Other'],// limit options
+    required: true,
+    default: 'Other'
+  },
 },{ timestamps: true } );
 
 
