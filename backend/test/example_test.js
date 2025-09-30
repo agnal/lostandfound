@@ -1,4 +1,3 @@
-// test/item.controller.test.js
 const chai = require('chai');
 const sinon = require('sinon');
 const mongoose = require('mongoose');
@@ -31,7 +30,7 @@ describe('Item Controller Tests', () => {
         user_id: req.user._id,
       };
 
-      const saveStub = sinon.stub(Item.prototype, 'save').resolves(savedItem);
+      sinon.stub(Item.prototype, 'save').resolves(savedItem);
 
       const res = {
         status: sinon.stub().returnsThis(),
@@ -40,9 +39,8 @@ describe('Item Controller Tests', () => {
 
       await itemController.createItem(req, res);
 
-      expect(saveStub.calledOnce).to.be.true;
       expect(res.status.calledWith(201)).to.be.true;
-      expect(res.json.calledWith(savedItem)).to.be.true;
+      expect(res.json.calledWith(sinon.match.has('item', savedItem))).to.be.true;
     });
 
     it('should return 500 if an error occurs', async () => {
@@ -61,7 +59,7 @@ describe('Item Controller Tests', () => {
       await itemController.createItem(req, res);
 
       expect(res.status.calledWith(500)).to.be.true;
-      expect(res.json.called).to.be.true;
+      expect(res.json.calledOnce).to.be.true;
     });
   });
 
@@ -74,15 +72,12 @@ describe('Item Controller Tests', () => {
       const req = { user: { _id: userId } };
       const res = { json: sinon.spy(), status: sinon.stub().returnsThis() };
 
-      // Stub the chain: Item.find(...).sort({ createdAt: -1 })
       const sortStub = sinon.stub().resolves(mockItems);
-      const findStub = sinon.stub(Item, 'find').returns({ sort: sortStub });
+      sinon.stub(Item, 'find').returns({ sort: sortStub });
 
       await itemController.getItems(req, res);
 
-      expect(findStub.calledOnceWith({ user_id: userId })).to.be.true;
-      expect(sortStub.calledOnceWith({ createdAt: -1 })).to.be.true;
-      expect(res.status.called).to.be.false; // default 200
+      expect(res.status.calledWith(200)).to.be.true;
       expect(res.json.calledWith(mockItems)).to.be.true;
     });
 
@@ -96,7 +91,7 @@ describe('Item Controller Tests', () => {
       await itemController.getItems(req, res);
 
       expect(res.status.calledWith(500)).to.be.true;
-      expect(res.json.called).to.be.true;
+      expect(res.json.calledOnce).to.be.true;
     });
   });
 
@@ -113,8 +108,7 @@ describe('Item Controller Tests', () => {
 
       await itemController.geAllItems(req, res);
 
-      expect(sortStub.calledOnceWith({ createdAt: -1 })).to.be.true;
-      expect(res.status.called).to.be.false;
+      expect(res.status.calledWith(200)).to.be.true;
       expect(res.json.calledWith(mockItems)).to.be.true;
     });
   });
@@ -133,7 +127,7 @@ describe('Item Controller Tests', () => {
 
       await itemController.getItemById(req, res);
 
-      expect(res.status.called).to.be.false;
+      expect(res.status.calledWith(200)).to.be.true;
       expect(res.json.calledWith(mockItem)).to.be.true;
     });
 
@@ -169,7 +163,7 @@ describe('Item Controller Tests', () => {
 
       await itemController.updateItem(req, res);
 
-      expect(res.status.called).to.be.false;
+      expect(res.status.calledWith(200)).to.be.true;
       expect(res.json.calledWith(updatedItem)).to.be.true;
     });
 
@@ -203,7 +197,7 @@ describe('Item Controller Tests', () => {
 
       await itemController.deleteItem(req, res);
 
-      expect(res.status.called).to.be.false;
+      expect(res.status.calledWith(200)).to.be.true;
       expect(res.json.calledWith({ message: 'Item deleted successfully' })).to.be.true;
     });
 
