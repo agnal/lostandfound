@@ -1,33 +1,37 @@
 import { useState, useEffect } from 'react';
 import axiosInstance from '../axiosConfig';
 import ItemList from '../components/ItemList';
+import SortDropdown from '../components/SortDropdown';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
 const Tasks = () => {
   const { user } = useAuth();
   const [tasks, setTasks] = useState([]);
+  const [sortBy, setSortBy] = useState('recent'); // Strategy
   const navigate = useNavigate();
 
   useEffect(() => {
     const fetchTasks = async () => {
       try {
-        const response = await axiosInstance.get('/api/main/items/all', {
+        const response = await axiosInstance.get(`/api/main/items/all?sortBy=${sortBy}`, {
           headers: { Authorization: `Bearer ${user.token}` },
         });
         setTasks(response.data);
       } catch (error) {
-        // alert('Failed to fetch tasks');
+        console.error('Failed to fetch tasks.', error);
       }
     };
 
-    fetchTasks();
-
-  }, [user]);
+    if (user) fetchTasks();
+  }, [user, sortBy]);
 
   return (
     <div className="container mx-auto p-6 relative">
+      {/* Strategy Pattern Dropdown */}
+      <SortDropdown sortBy={sortBy} setSortBy={setSortBy} />
 
+      {/* Task List */}
       <ItemList initialTasks={tasks} />
 
       {/* Floating Action Button */}
@@ -40,10 +44,8 @@ const Tasks = () => {
           +
         </button>
       )}
-
     </div>
   );
-  // ...existing code...
 };
 
 export default Tasks;

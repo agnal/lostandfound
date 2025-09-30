@@ -4,6 +4,7 @@ const dotenv = require('dotenv');
 const cors = require('cors');
 const connectDB = require('./config/db');
 const path = require("path");
+const fs = require('fs');
 dotenv.config();
 
 
@@ -14,6 +15,12 @@ app.use(express.json());
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/main', require('./routes/mainRoutes'));
 app.use('/api/admin', require('./routes/adminRoutes'));
+
+
+const uploadDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadDir)){
+    fs.mkdirSync(uploadDir);
+}
 
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 // Export the app object for testing

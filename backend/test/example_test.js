@@ -5,6 +5,7 @@ const mongoose = require('mongoose');
 const { expect } = chai;
 
 const Item = require('../models/Item');
+// const User = require('../../models/User'); 
 const itemController = require('../controllers/mainController');
 
 describe('Item Controller Tests', () => {
