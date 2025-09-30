@@ -1,7 +1,5 @@
-// backend/decorator.js
-function addRecentlyAddedTag(item, expiryHours = 1) {
+function addRecentlyAddedTag(item, expiryMinutes = 2) {
   try {
-    // Mongoose docs are objects, so convert them to plain JS objects safely
     const plainItem = item.toObject ? item.toObject() : item;
 
     if (!plainItem.createdAt) {
@@ -10,11 +8,11 @@ function addRecentlyAddedTag(item, expiryHours = 1) {
 
     const now = new Date();
     const createdAt = new Date(plainItem.createdAt);
-    const diffHours = (now - createdAt) / (1000 * 60 * 60);
+    const diffMinutes = (now - createdAt) / (1000 * 60);
 
     return {
       ...plainItem,
-      recentlyAdded: diffHours <= expiryHours, // ✅ true only if within expiry window
+      recentlyAdded: diffMinutes <= expiryMinutes,
     };
   } catch (err) {
     console.error("Decorator error:", err.message);
@@ -23,45 +21,37 @@ function addRecentlyAddedTag(item, expiryHours = 1) {
 }
 
 const addCategoryTag = (item) => {
-  let categoryLabel = "General";
+  const plainItem = item.toObject ? item.toObject() : item;
 
-  switch (item.category) {
-    case "Lost":
-      categoryLabel = "Lost Item";
-      break;
-    case "Found":
+  let categoryLabel = "Other";
+  switch (plainItem.category) {
+    case "Documents":
       categoryLabel = "Found Item";
       break;
     case "Electronics":
       categoryLabel = "Electronic Device";
       break;
-    case "Documents":
-      categoryLabel = "Important Document";
+    case "Clothing":
+      categoryLabel = "Clothing";
       break;
-    case "Clothes":
+    case "Accessories":
       categoryLabel = "Clothing / Apparel";
       break;
     default:
-      categoryLabel = "Miscellaneous";
+      categoryLabel = "Other";
   }
 
-  return {
-    ...item.toObject(),
-    categoryLabel,
-  };
+  return { ...plainItem, categoryLabel };
 };
 
-// ✅ New decorator: verified label
 const addVerifiedTag = (item) => {
-  return {
-    ...item.toObject(),
-    verifiedLabel: item.verified ? "Verified ✅" : "Not Verified ❌",
-  };
+  const plainItem = item.toObject ? item.toObject() : item;
+  return { ...plainItem, verifiedLabel: plainItem.verified ? "Verified ✅" : "Not Verified ❌" };
 };
 
-// ✅ Compose multiple decorators easily
+// ✅ Compose decorators safely
 const decorateItem = (item) => {
-  let decorated = addRecentlyAddedTag(item, 24);
+  let decorated = addRecentlyAddedTag(item, 2); // 2 mins
   decorated = addCategoryTag(decorated);
   decorated = addVerifiedTag(decorated);
   return decorated;
@@ -73,11 +63,3 @@ module.exports = {
   addVerifiedTag,
   decorateItem,
 };
-
-
-
-
-
-
-
-// module.exports = { addRecentlyAddedTag };

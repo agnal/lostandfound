@@ -1,5 +1,6 @@
 const Item = require("../models/Item");
-const { addRecentlyAddedTag } = require('../services/decorators/itemDecorators');
+// const { addRecentlyAddedTag } = require('../services/decorators/itemDecorators');
+const { decorateItem } = require('../services/decorators/itemDecorators');
 
 
 // ✅ Create a new item
@@ -21,7 +22,8 @@ exports.createItem = async (req, res) => {
     const savedItem = await newItem.save();
 
     // Apply decorators
-     const decoratedItem = addRecentlyAddedTag(savedItem);
+    //  const decoratedItem = addRecentlyAddedTag(savedItem);
+     const decoratedItem = decorateItem(savedItem);
 
     
     res.status(201).json(decoratedItem);
@@ -35,10 +37,12 @@ exports.createItem = async (req, res) => {
 // ✅ Get all items for logged-in user
 exports.getItems = async (req, res) => {
   try {
-    const items = await Item.find({ user_id: req.user._id }).sort({ createdAt: -1 });
+    // const items = await Item.find({ user_id: req.user._id }).sort({ createdAt: -1 });
+    let items = await Item.find({ user_id: req.user._id }).sort({ createdAt: -1 });
      // Update recent status for each item
     // items = items.map(item => checkRecentStatus(item));
-    items = items.map(item => addRecentlyAddedTag(item, 1));
+    // items = items.map(item => addRecentlyAddedTag(item, 2));
+    items = items.map(item => decorateItem(item));
     res.json(items);
   } catch (error) {
     res.status(500).json({ message: "Error fetching items", error });
@@ -49,8 +53,10 @@ exports.getItems = async (req, res) => {
 exports.geAllItems = async (req, res) => {
   try {
     let { sortBy } = req.query;
+    // let items = await Item.find().sort({ createdAt: -1 });
     let items = await Item.find().sort({ createdAt: -1 });
-    items = items.map(item => addRecentlyAddedTag(item, 1));
+    // items = items.map(item => addRecentlyAddedTag(item, 2));
+    items = items.map(item => decorateItem(item));
 
     // Sort items based on strategy
     switch (sortBy) {
@@ -68,15 +74,7 @@ exports.geAllItems = async (req, res) => {
         items.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     }
 
-
-
-
-
-
     res.json(items);
-
-    
-
    
   } catch (error) {
     res.status(500).json({ message: "Error fetching items", error });
