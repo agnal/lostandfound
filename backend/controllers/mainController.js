@@ -1,4 +1,6 @@
 const Item = require("../models/Item");
+const { addRecentlyAddedTag } = require('../services/decorators/itemDecorators');
+
 
 // ✅ Create a new item
 exports.createItem = async (req, res) => {
@@ -14,8 +16,14 @@ exports.createItem = async (req, res) => {
       user_id: req.user._id, // from auth middleware
     });
 
+    // Save item in DB first (so createdAt gets added)
     const savedItem = await newItem.save();
-    res.status(201).json(savedItem);
+
+    // Apply decorators
+     const decoratedItem = addRecentlyAddedTag(savedItem);
+
+    
+    res.status(201).json(decoratedItem);
   } catch (error) {
     console.log(error);
     
@@ -27,6 +35,9 @@ exports.createItem = async (req, res) => {
 exports.getItems = async (req, res) => {
   try {
     const items = await Item.find({ user_id: req.user._id }).sort({ createdAt: -1 });
+     // Update recent status for each item
+    // items = items.map(item => checkRecentStatus(item));
+    items = items.map(item => addRecentlyAddedTag(item, 24));
     res.json(items);
   } catch (error) {
     res.status(500).json({ message: "Error fetching items", error });
@@ -36,8 +47,11 @@ exports.getItems = async (req, res) => {
 // ✅ Get all items 
 exports.geAllItems = async (req, res) => {
   try {
-    const items = await Item.find().sort({ createdAt: -1 });
+    let items = await Item.find().sort({ createdAt: -1 });
+    items = items.map(item => addRecentlyAddedTag(item, 24));
     res.json(items);
+
+    // res.json(items);
   } catch (error) {
     res.status(500).json({ message: "Error fetching items", error });
   }
@@ -46,7 +60,7 @@ exports.geAllItems = async (req, res) => {
 // ✅ Get single item by ID
 exports.getItemById = async (req, res) => {
   try {
-    const item = await Item.findOne({ _id: req.params.id, user_id: req.user._id });
+    let item = await Item.findOne({ _id: req.params.id, user_id: req.user._id });
 
     if (!item) return res.status(404).json({ message: "Item not found" });
 
