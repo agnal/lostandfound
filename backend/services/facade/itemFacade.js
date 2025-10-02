@@ -64,4 +64,5 @@ class ItemFacade {
     }
 }
 
+// Singleton instance exported
 module.exports = new ItemFacade();
