@@ -6,7 +6,7 @@ const {
   getItemById,
   updateItem,
   deleteItem,
-  geAllItems
+  getAllItems
 } = require("../controllers/mainController");
 const { protect } = require("../services/middleware/authMiddleware");
 const multer = require("multer");
@@ -29,7 +29,7 @@ router.post("/item", protect,upload.single("image"), createItem);
 
 // ✅ Get all items for logged-in user
 router.get("/items", protect, getItems);
-router.get("/items/all", protect, geAllItems);
+router.get("/items/all", protect, getAllItems);
 
 
 // ✅ Get single item by ID

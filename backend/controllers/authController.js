@@ -21,6 +21,7 @@ const registerUser = async (req, res) => {
 };
 
 const loginUser = async (req, res) => {
+    console.log("Came in loginUser");
     const { email, password } = req.body;
     try {
         const user = await User.findOne({ email });

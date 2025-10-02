@@ -26,16 +26,16 @@ const addCategoryTag = (item) => {
   let categoryLabel = "Other";
   switch (plainItem.category) {
     case "Documents":
-      categoryLabel = "Found Item";
+      categoryLabel = "Documents";
       break;
     case "Electronics":
-      categoryLabel = "Electronic Device";
+      categoryLabel = "Electronics";
       break;
     case "Clothing":
       categoryLabel = "Clothing";
       break;
     case "Accessories":
-      categoryLabel = "Clothing / Apparel";
+      categoryLabel = "Accessories";
       break;
     default:
       categoryLabel = "Other";
