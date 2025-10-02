@@ -1,40 +1,39 @@
-const Item = require("../../models/Item");
 const { decorateItem } = require("../decorators/itemDecorators");
+const MongoDBAdapter = require("../../adapters/MongoDBAdapter");
 
 class ItemFacade {
-    // Create and decorate item
+    constructor(dbAdapter) {
+        this.dbAdapter = dbAdapter;
+    }
+
     async create(user, itemData, file) {
-        const newItem = new Item({
+        const newItem = {
             ...itemData,
             image: file ? `/uploads/${file.filename}` : null,
             user_id: user._id,
-        });
+        };
 
-        const savedItem = await newItem.save();
-        const decoratedItem = decorateItem(savedItem);
-        return decoratedItem;
+        const savedItem = await this.dbAdapter.createItem(newItem);
+        return decorateItem(savedItem);
     }
 
-    // Get items for a specific user
     async getUserItems(user) {
-        let items = await Item.find({ user_id: user._id }).sort({ createdAt: -1 });
-        items = items.map(item => decorateItem(item));
-        return items;
+        let items = await this.dbAdapter.getUserItems(user._id);
+        return items.map(item => decorateItem(item));
     }
 
-    // Get all items with optional sorting
     async getAllItems(sortBy) {
-        let items = await Item.find().sort({ createdAt: -1 });
+        let items = await this.dbAdapter.getAllItems();
         items = items.map(item => decorateItem(item));
 
         switch (sortBy) {
-            case 'recent':
+            case "recent":
                 items.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
                 break;
-            case 'verified':
+            case "verified":
                 items.sort((a, b) => (b.verified === true) - (a.verified === true));
                 break;
-            case 'category':
+            case "category":
                 items.sort((a, b) => a.category.localeCompare(b.category));
                 break;
             default:
@@ -44,24 +43,18 @@ class ItemFacade {
         return items;
     }
 
-    // Get single item by ID
     async getItemById(user, itemId) {
-        return await Item.findOne({ _id: itemId, user_id: user._id });
+        return await this.dbAdapter.getItemById(user._id, itemId);
     }
 
-    // Update item
     async updateItem(user, itemId, updateData) {
-        return await Item.findOneAndUpdate(
-            { _id: itemId, user_id: user._id },
-            updateData,
-            { new: true, runValidators: true }
-        );
+        return await this.dbAdapter.updateItem(user._id, itemId, updateData);
     }
 
-    // Delete item
     async deleteItem(user, itemId) {
-        return await Item.findOneAndDelete({ _id: itemId, user_id: user._id });
+        return await this.dbAdapter.deleteItem(user._id, itemId);
     }
 }
 
-module.exports = new ItemFacade();
+// Inject MongoDBAdapter instance here
+module.exports = new ItemFacade(new MongoDBAdapter());
