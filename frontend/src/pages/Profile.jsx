@@ -35,7 +35,7 @@ const Profile = () => {
 
     if (user) fetchProfile();
   }, [user]);
-
+// updated profile fetch
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
