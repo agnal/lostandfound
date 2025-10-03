@@ -1,19 +1,24 @@
 const { decorateItem } = require("../decorators/itemDecorators");
 const MongoDBAdapter = require("../../adapters/MongoDBAdapter");
+const { ItemFactory } = require("../factory/itemFactory"); // <-- Import factory
 
 class ItemFacade {
     constructor(dbAdapter) {
         this.dbAdapter = dbAdapter;
     }
 
+    // Use Factory for item creation
     async create(user, itemData, file) {
-        const newItem = {
+        // Determine type from itemData.type
+        const type = itemData.type || "lost"; // default to "lost" if not provided
+        const newItemObject = ItemFactory.createItem(type, {
             ...itemData,
             image: file ? `/uploads/${file.filename}` : null,
             user_id: user._id,
-        };
+        });
 
-        const savedItem = await this.dbAdapter.createItem(newItem);
+        // Save via adapter
+        const savedItem = await this.dbAdapter.createItem(newItemObject);
         return decorateItem(savedItem);
     }
 
