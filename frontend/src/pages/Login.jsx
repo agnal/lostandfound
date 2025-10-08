@@ -132,13 +132,6 @@ const Login = () => {
                 {loading ? 'Signing In...' : 'Sign In'}
               </Button>
 
-              {/* Demo Info */}
-              <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-lg text-xs mt-4">
-                <p className="font-semibold mb-1">Demo Admin Credentials:</p>
-                <p>Email: admin@back2you.com</p>
-                <p>Password: admin123</p>
-              </div>
-
               {/* Footer Links */}
               <div className="flex flex-col items-center space-y-3 mt-6 text-gray-400 text-sm">
                 <button type="button" className="hover:text-[#a0f1bd] transition-colors">
