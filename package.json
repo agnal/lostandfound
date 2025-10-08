@@ -14,5 +14,9 @@
     "nodemon": "^3.1.10"
   },
   "author": "Agnal",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "@radix-ui/react-slot": "^1.2.3",
+    "class-variance-authority": "^0.7.1"
+  }
 }

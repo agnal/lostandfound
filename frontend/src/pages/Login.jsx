@@ -16,7 +16,7 @@ const Login = () => {
       console.log("No error in logging");
       login(response.data);
       
-      navigate('/');
+      navigate('/userlandingpage');
     } catch (error) {
       alert('Login failed. Please try again.');
     }
