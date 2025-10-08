@@ -1,6 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import axiosInstance from '../axiosConfig';
+import { MenuBar } from '../components/MenuBar';
+import { Button } from '../components/ui/Button';
+import { Input } from '../components/ui/Input';
+import { Label } from '../components/ui/Label';
+
 
 const Profile = () => {
   const { user } = useAuth(); // Access user token from context
@@ -56,41 +61,61 @@ const Profile = () => {
   }
 
   return (
-    <div className="max-w-md mx-auto mt-20">
-      <form onSubmit={handleSubmit} className="bg-white p-6 shadow-md rounded">
-        <h1 className="text-2xl font-bold mb-4 text-center">Your Profile</h1>
-        <input
-          type="text"
-          placeholder="Name"
-          value={formData.name}
-          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-          className="w-full mb-4 p-2 border rounded"
-        />
-        <input
-          type="email"
-          placeholder="Email"
-          value={formData.email}
-          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-          className="w-full mb-4 p-2 border rounded"
-        />
-        <input
-          type="text"
-          placeholder="University"
-          value={formData.university}
-          onChange={(e) => setFormData({ ...formData, university: e.target.value })}
-          className="w-full mb-4 p-2 border rounded"
-        />
-        <input
-          type="text"
-          placeholder="Address"
-          value={formData.address}
-          onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-          className="w-full mb-4 p-2 border rounded"
-        />
-        <button type="submit" className="w-full bg-blue-600 text-white p-2 rounded">
-          {loading ? 'Updating...' : 'Update Profile'}
-        </button>
-      </form>
+   <div className="min-h-screen bg-[#f5fff9]">
+      <MenuBar />
+      <div className="max-w-xl mx-auto mt-16 px-4">
+        <form onSubmit={handleSubmit} className="bg-white/90 backdrop-blur rounded-2xl p-8 shadow-lg flex flex-col gap-5">
+          <h1 className="text-3xl font-semibold text-[#2d4f20] text-center">Your Profile</h1>
+
+          <div className="flex flex-col gap-2">
+            <Label className="text-sm text-[#2d4f20]">Name</Label>
+            <Input
+              type="text"
+              placeholder="Name"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              className="h-12 rounded border border-black bg-white"
+            />
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Label className="text-sm text-[#2d4f20]">Email</Label>
+            <Input
+              type="email"
+              placeholder="Email"
+              value={formData.email}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              className="h-12 rounded border border-black bg-white"
+            />
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Label className="text-sm text-[#2d4f20]">University</Label>
+            <Input
+              type="text"
+              placeholder="University"
+              value={formData.university}
+              onChange={(e) => setFormData({ ...formData, university: e.target.value })}
+              className="h-12 rounded border border-black bg-white"
+            />
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Label className="text-sm text-[#2d4f20]">Address</Label>
+            <Input
+              type="text"
+              placeholder="Address"
+              value={formData.address}
+              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+              className="h-12 rounded border border-black bg-white"
+            />
+          </div>
+
+          <Button type="submit" disabled={loading} className="w-full bg-[#2d4f20] hover:bg-[#1f3517] text-white rounded-full py-3">
+            {loading ? 'Updating...' : 'Update Profile'}
+          </Button>
+        </form>
+      </div>
     </div>
   );
 };
